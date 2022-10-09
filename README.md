@@ -5,6 +5,8 @@ This mod adds a general-purpose developer console in the game to be used by othe
 
 To open the console, press the `~` key ingame.
 
+To try out the console with some premade commands, download the [Console Cheats](https://github.com/Smaedd/OW_ConsoleCheats) mod.
+
 ### Using the console in your mod
 
 To use the console in your mod, copy `DeveloperConsole/ConsoleUtil.cs` to your mod, and run: 
