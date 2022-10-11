@@ -102,10 +102,12 @@ namespace DeveloperConsole
         private static Dictionary<string, ConVar> _convars = null;
         private static Dictionary<string, ConCommand> _concommands = null;
 
-        private const int MAX_CONSOLE_MESSAGES = 255;
+        private const int MAX_CONSOLE_MESSAGES = 3;
         private static Queue<string> _conlog = null;
 
-        public event EventHandler<string> LogChanged;
+        public static int NumLogs => _conlog.Count;
+
+        public event EventHandler LogChanged;
 
         private static void WriteLine(string message, MessageType type = MessageType.Message)
         {
@@ -130,16 +132,20 @@ namespace DeveloperConsole
             OnLogChanged();
         }
 
+        public static string GetLog(int index)
+        {
+            if (_conlog == null)
+                return null;
+
+            if (index < 0 || index >= _conlog.Count())
+                return null;
+
+            return _conlog.ElementAt(index);
+        }
+
         private void OnLogChanged()
         {
-            StringBuilder builder = new();
-
-            foreach (var line in _conlog)
-            {
-                builder.AppendLine(line);
-            }
-
-            LogChanged?.Invoke(this, builder.ToString());
+            LogChanged?.Invoke(this, null);
         }
 
         public void LoadAttributes(Assembly assembly, Type containerType, Type consoleType)
