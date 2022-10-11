@@ -8,52 +8,11 @@ using UnityEngine.UI;
 using System.Linq;
 using System;
 using UniverseLib;
+using DeveloperConsole.ConsoleTypes;
+using DeveloperConsole.Patches;
 
-namespace DeveloperConsole
+namespace DeveloperConsole.UI
 {
-    internal class MessageCell : ICell
-    {
-        private Image _image;
-        public InputFieldRef TextHolder;
-
-        public Color BackgroundColor
-        {
-            get => _image.color;
-            set => _image.color = value;
-        }
-
-        public GameObject UIRoot { get; set; }
-        public RectTransform Rect { get; set; }
-
-        public float DefaultHeight => 25;
-
-        public bool Enabled => UIRoot.activeInHierarchy;
-        public void Enable() => UIRoot.SetActive(true);
-        public void Disable() => UIRoot.SetActive(false);
-
-        public GameObject CreateContent(GameObject parent)
-        {
-            UIRoot = UIFactory.CreateUIObject("MessageCell", parent, new Vector2(DefaultHeight, DefaultHeight));
-            Rect = UIRoot.GetComponent<RectTransform>();
-            UIFactory.SetLayoutGroup<HorizontalLayoutGroup>(UIRoot, false, false, true, true, 3);
-            UIFactory.SetLayoutElement(UIRoot, minHeight: (int)DefaultHeight, minWidth: (int)DefaultHeight, flexibleWidth: 9999);
-
-            TextHolder = UIFactory.CreateInputField(UIRoot, "Message", "");
-            UIFactory.SetLayoutElement(TextHolder.GameObject, minHeight: (int)DefaultHeight, minWidth: (int)DefaultHeight, flexibleWidth: 9999);
-
-            _image = TextHolder.Component.GetComponent<Image>();
-            _image.color = new Color(0.2f, 0.2f, 0.2f);
-
-            TextHolder.Component.readOnly = true;
-            TextHolder.Component.textComponent.supportRichText = true;
-            TextHolder.Component.lineType = InputField.LineType.MultiLineNewline;
-            TextHolder.Component.textComponent.font = UniversalUI.ConsoleFont;
-            TextHolder.PlaceholderText.font = UniversalUI.ConsoleFont;
-
-            return UIRoot;
-        }
-    }
-
     internal class ConsolePanel : PanelBase, ICellPoolDataSource<MessageCell>
     {
         public ConsolePanel(UIBase owner) : base(owner) { }
@@ -83,7 +42,7 @@ namespace DeveloperConsole
 
             _consoleScrollPool.Initialize(this);
 
-            DeveloperConsole.Manager.LogChanged += (object sender, EventArgs args) =>
+            ConsoleManager.LogChanged += (sender, args) =>
             {
                 _consoleScrollPool.Refresh(true, false);
                 _consoleScrollPool.JumpToIndex(ItemCount - 1, null);
@@ -110,10 +69,22 @@ namespace DeveloperConsole
             submitButton.OnClick += SubmitCommand;
         }
 
-        private readonly Color logEvenColor = new(0.3f, 0.3f, 0.3f);
-        private readonly Color logOddColor = new(0.2f, 0.2f, 0.2f);
+        private readonly Color logEvenColor = new(0.5f, 0.5f, 0.5f);
+        private readonly Color logOddColor = new(0.4f, 0.4f, 0.4f);
         public void OnCellBorrowed(MessageCell cell) { }
-        
+
+        private Color GetMessageColor(ConsoleLogType type)
+        {
+            return type switch
+            {
+                ConsoleLogType.Message => new Color(0.9f, 0.9f, 0.9f),
+                ConsoleLogType.Light => new Color(0.7f, 0.7f, 0.7f),
+                ConsoleLogType.Warning => new Color(1.0f, 0.9f, 0.1f),
+                ConsoleLogType.Error => new Color(1.0f, 0.1f, 0.1f),
+                _ => new Color(1.0f, 1.0f, 0.0f)
+            };
+        }
+
         public void SetCell(MessageCell cell, int index)
         {
             if (index >= ItemCount)
@@ -122,7 +93,10 @@ namespace DeveloperConsole
                 return;
             }
 
-            cell.TextHolder.Text = ConsoleManager.GetLog(index);
+            Log log = ConsoleManager.GetLog(index);
+
+            cell.TextHolder.Text = log.Message;
+            cell.TextHolder.Component.textComponent.color = GetMessageColor(log.Type);
 
             Color color = index % 2 == 0 ? logEvenColor : logOddColor;
             RuntimeHelper.SetColorBlock(cell.TextHolder.Component, color);
@@ -160,9 +134,9 @@ namespace DeveloperConsole
         private void OnToggled()
         {
             Owner.Enabled = Enabled = !Owner.Enabled;
-            ConsoleInputPatch.InConsole = Enabled;
+            InputPatch.InConsole = Enabled;
 
-            ConfigManager.Force_Unlock_Mouse = Enabled;                
+            ConfigManager.Force_Unlock_Mouse = Enabled;
         }
 
         protected override void OnClosePanelClicked()
@@ -172,25 +146,21 @@ namespace DeveloperConsole
 
         public void SubmitCommand()
         {
-            void OnSuccess()
-            {
-                DeveloperConsole.Manager.Log("> " + _inputField.Text);
-                _lastCommand = _inputField.Text;
-                _inputField.Text = "";
-            }
+            ConsoleManager.Log("> " + _inputField.Text, ConsoleLogType.Light);
+            _lastCommand = _inputField.Text;
+            _inputField.Text = "";
 
-            string[] allArgs = _inputField.Text.Trim().Split(' ');
+            string[] allArgs = _lastCommand.Trim().Split(' ');
 
             string name = allArgs.First();
             string[] args = allArgs.Skip(1).ToArray();
 
             if (args.Length == 0)
             {
-                var getResult = (ValueResult)DeveloperConsole.Manager.GetStringValue(name, out var value, true);
+                var getResult = ConsoleManager.GetStringValue(name, out var value, true);
                 if (getResult == ValueResult.Success)
                 {
-                    OnSuccess();
-                    DeveloperConsole.Manager.Log($"{name} = {value}");
+                    ConsoleManager.Log($"{name} = {value}");
                     return;
                 }
 
@@ -200,25 +170,16 @@ namespace DeveloperConsole
             }
             else if (args.Length == 1)
             {
-                var setResult = (ValueResult)DeveloperConsole.Manager.SetValue(name, args[0], true);
+                var setResult = ConsoleManager.SetValue(name, args[0], true);
                 if (setResult == ValueResult.Success)
-                {
-                    OnSuccess();
                     return;
-                }
 
                 // If we know the convar, we can leave
                 if (setResult != ValueResult.UnknownValue)
                     return;
             }
 
-            var result = (RunCommandResult)DeveloperConsole.Manager.RunCommand(name, args, false);
-
-            // Clear if valid command/args
-            if (result == RunCommandResult.Success)
-            {
-                OnSuccess();
-            } 
+            ConsoleManager.RunCommand(name, args, false);
         }
     }
 }

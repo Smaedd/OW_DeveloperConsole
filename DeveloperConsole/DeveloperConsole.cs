@@ -6,13 +6,15 @@ using UniverseLib;
 using UniverseLib.UI;
 using System;
 using System.Reflection;
+using DeveloperConsole.UI;
+using DeveloperConsole.Patches;
 
 namespace DeveloperConsole
 {
     public class DeveloperConsole : ModBehaviour
     {
         public static DeveloperConsole Instance;
-        internal static ConsoleManager Manager { get; private set; }
+        internal static ConsoleManagerInstance Manager { get; private set; }
 
         public static UIBase uiBase { get; private set; }
 
@@ -35,7 +37,7 @@ namespace DeveloperConsole
         {
             ModHelper.Console.WriteLine("Querying API");
 
-            Manager ??= new ConsoleManager();
+            Manager ??= new ConsoleManagerInstance();
             return Manager;
         }
 
@@ -71,7 +73,7 @@ namespace DeveloperConsole
 
             uiBase.Enabled = false;
 
-            ConsoleInputPatch.InConsole = false;
+            InputPatch.InConsole = false;
         }
     }
 }

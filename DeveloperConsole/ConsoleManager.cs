@@ -1,4 +1,5 @@
-﻿using OWML.Common;
+﻿using DeveloperConsole.ConsoleTypes;
+using OWML.Common;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -9,152 +10,37 @@ using System.Text;
 
 namespace DeveloperConsole
 {
-    internal class ConVar
+    // Wrapper class that is both instanceable and conforms to the requirements of the API.
+    public class ConsoleManagerInstance : IConsoleManager
     {
-        private FieldInfo _field;
-        private PropertyInfo _property;
+        public bool LoadAttributes(Assembly assembly, Type containerType, Type consoleType) => ConsoleManager.LoadAttributes(assembly, containerType, consoleType);
 
-        public readonly Type Type;
-        public string Info { get; set; } = null;
+        public int SetValue(string name, object value, bool silent = false) => (int)ConsoleManager.SetValue(name, value, silent);
+        public int GetValue(string name, out object value, bool silent = false) => (int)ConsoleManager.GetValue(name, out value, silent);
+        public int GetStringValue(string name, out string value, bool silent = false) => (int)ConsoleManager.GetStringValue(name, out value, silent);
 
-        public ConVar(FieldInfo field)
-        {
-            _field = field;
-            _property = null;
+        public int RunCommand(string name, object[] arguments, bool silent = false) => (int)ConsoleManager.RunCommand(name, arguments, silent);
 
-            Type = field.FieldType;
-        }
-
-        public ConVar(PropertyInfo property)
-        {
-            _field = null;
-            _property = property;
-
-            Type = property.PropertyType;
-        }
-
-        public void SetValue(object val)
-        {
-            if (_field != null)
-            {
-                _field.SetValue(null, val);
-            }
-            else // property
-            {
-                _property.SetValue(null, val);
-            }
-        }
-
-        public object GetValue()
-        {
-            if (_field != null)
-            {
-                return _field.GetValue(null);
-            }
-            else // property
-            {
-                return _property.GetValue(null);
-            }
-        }
-
-        public object[] GetCustomAttributes(Type type, bool inherit = false)
-        {
-            if (_field != null)
-            {
-                return _field.GetCustomAttributes(type, inherit);
-            }
-            else // property
-            {
-                return _property.GetCustomAttributes(type, inherit);
-            }
-        }
+        public void Log(string message, int type = 0) => ConsoleManager.Log(message, (ConsoleLogType)type);
     }
 
-    internal class ConCommand
+    internal static class ConsoleManager
     {
-        public readonly int RequiredArgs;
-        public readonly int MaxArgs;
+        private static Dictionary<string, Var> _convars = new();
+        private static Dictionary<string, Command> _concommands = new();
 
-        public readonly ParameterInfo[] Parameters;
+        private const int MAX_CONSOLE_MESSAGES = 255;
+        private static Queue<Log> _conlogs = new();
+        public static int NumLogs => _conlogs.Count;
+        public static event EventHandler LogChanged;
 
-        public string Info { get; set; } = null;
-
-        public readonly MethodInfo Method;
-
-        public ConCommand(MethodInfo method)
-        {
-            Method = method;
-
-            Parameters = Method.GetParameters();
-
-            RequiredArgs = Parameters.Where(p => !p.HasDefaultValue).Count();
-            MaxArgs = Parameters.Count();
-        }
-
-        public object[] GetCustomAttributes(Type type, bool inherit = false)
-        {
-            return Method.GetCustomAttributes(type, inherit);
-        }
-    }
-
-    public class ConsoleManager : IConsoleManager
-    {
-        private static Dictionary<string, ConVar> _convars = null;
-        private static Dictionary<string, ConCommand> _concommands = null;
-
-        private const int MAX_CONSOLE_MESSAGES = 3;
-        private static Queue<string> _conlog = null;
-
-        public static int NumLogs => _conlog.Count;
-
-        public event EventHandler LogChanged;
-
-        private static void WriteLine(string message, MessageType type = MessageType.Message)
-        {
-            DeveloperConsole.Instance.ModHelper.Console.WriteLine(message, type);
-        }
-
-        public void Log(string message)
-        {
-            if (_conlog == null)
-            {
-                WriteLine($"ConsoleManager.Log called with \"{message}\" while uninitialized!", MessageType.Warning);
-                return;
-            }
-
-            _conlog.Enqueue(message);
-            
-            if (_conlog.Count > MAX_CONSOLE_MESSAGES)
-            {
-                _conlog.Dequeue();
-            }
-
-            OnLogChanged();
-        }
-
-        public static string GetLog(int index)
-        {
-            if (_conlog == null)
-                return null;
-
-            if (index < 0 || index >= _conlog.Count())
-                return null;
-
-            return _conlog.ElementAt(index);
-        }
-
-        private void OnLogChanged()
-        {
-            LogChanged?.Invoke(this, null);
-        }
-
-        public void LoadAttributes(Assembly assembly, Type containerType, Type consoleType)
+        public static bool LoadAttributes(Assembly assembly, Type containerType, Type consoleType)
         {
             if ( !containerType.IsSubclassOf(typeof(Attribute)) ||
                  !consoleType.IsSubclassOf(typeof(Attribute)) )
             {
-                WriteLine("LoadAttributes called with non-Attribute types!", MessageType.Error);
-                return;
+                WriteModHelperLine("LoadAttributes called with non-Attribute types!", MessageType.Error);
+                return false;
             }
 
             PropertyInfo nameProp = consoleType.GetProperty("Name");
@@ -167,17 +53,13 @@ namespace DeveloperConsole
                 !infoProp.CanRead ||
                 infoProp.PropertyType != typeof(string))
             {
-                WriteLine("LoadAttributes called with non-conforming consoleType!", MessageType.Error);
-                return;
+                WriteModHelperLine("LoadAttributes called with non-conforming consoleType!", MessageType.Error);
+                return false;
             }
-
-            _convars ??= new();
-            _concommands ??= new();
-            _conlog ??= new();
 
             foreach (Type type in GetContainerTypes(assembly, containerType))
             {
-                foreach (ConVar convar in GetConVars(type, consoleType))
+                foreach (Var convar in GetConVars(type, consoleType))
                 {
                     foreach (var console in convar.GetCustomAttributes(consoleType))
                     {
@@ -188,7 +70,7 @@ namespace DeveloperConsole
                     }
                 }
 
-                foreach (ConCommand command in GetConCommands(type, consoleType))
+                foreach (Command command in GetConCommands(type, consoleType))
                 {
                     foreach (var console in command.GetCustomAttributes(consoleType))
                     {
@@ -199,21 +81,18 @@ namespace DeveloperConsole
                     }
                 }
             }
+
+            return true;
         }
 
-        public int GetStringValue(string name, out string value, bool silent = false) => (int)_GetStringValue(name, out value, silent);
-        public int GetValue(string name, out object value, bool silent = false) => (int)_GetValue(name, out value, silent);
-        public int SetValue(string name, object value, bool silent = false) => (int)_SetValue(name, value, silent);
-        public int RunCommand(string name, object[] arguments, bool silent = false) => (int)_RunCommand(name, arguments, silent);
-
-        private ValueResult _GetStringValue(string name, out string value, bool silent = false)
+        public static ValueResult GetStringValue(string name, out string value, bool silent = false)
         {
             value = null;
 
             if (!_convars.TryGetValue(name, out var convar))
             {
                 if (!silent)
-                    Log($"Unknown variable: \"{name}\"");
+                    Log($"Unknown variable: \"{name}\"", ConsoleLogType.Error);
 
                 return ValueResult.UnknownValue;
             }
@@ -232,27 +111,27 @@ namespace DeveloperConsole
             }
             catch (NotSupportedException)
             {
-                WriteLine($"Unable to convert {name} to string", MessageType.Error);
+                WriteModHelperLine($"Unable to convert {name} to string", MessageType.Error);
             }
             catch (Exception e)
             {
-                WriteLine(e.StackTrace, MessageType.Error);
+                WriteModHelperLine(e.StackTrace, MessageType.Error);
             }
 
             if (!silent)
-                Log($"An error occurred in getting the value of: \"{name}\"");
+                Log($"An error occurred in getting the value of: \"{name}\"", ConsoleLogType.Error);
 
             return ValueResult.InvalidValue;
         }
 
-        private ValueResult _GetValue(string name, out object value, bool silent = false)
+        public static ValueResult GetValue(string name, out object value, bool silent = false)
         {
             value = null;
 
             if (!_convars.TryGetValue(name, out var convar))
             {
                 if (!silent)
-                    Log($"Unknown variable: \"{name}\"");
+                    Log($"Unknown variable: \"{name}\"", ConsoleLogType.Error);
 
                 return ValueResult.UnknownValue;
             }
@@ -264,21 +143,21 @@ namespace DeveloperConsole
             }
             catch (Exception e)
             {
-                WriteLine(e.StackTrace, MessageType.Error);
+                WriteModHelperLine(e.StackTrace, MessageType.Error);
             }
 
             if (!silent)
-                Log($"An error occurred in getting the value of: \"{name}\"");
+                Log($"An error occurred in getting the value of: \"{name}\"", ConsoleLogType.Error);
 
             return ValueResult.InvalidValue;
         }
 
-        private ValueResult _SetValue(string name, object value, bool silent = false)
+        public static ValueResult SetValue(string name, object value, bool silent = false)
         {
             if (!_convars.TryGetValue(name, out var convar))
             {
                 if (!silent)
-                    Log($"Unknown variable: \"{name}\"");
+                    Log($"Unknown variable: \"{name}\"", ConsoleLogType.Error);
 
                 return ValueResult.UnknownValue;
             }
@@ -298,25 +177,25 @@ namespace DeveloperConsole
             }
             catch (NotSupportedException)
             {
-                WriteLine($"Unable to convert given value to {name}", MessageType.Error);
+                WriteModHelperLine($"Unable to convert given value to {name}", MessageType.Error);
             }
             catch (Exception e)
             {
-                WriteLine(e.StackTrace, MessageType.Error);
+                WriteModHelperLine(e.StackTrace, MessageType.Error);
             }
 
             if (!silent)
-                Log($"An error occurred in setting: \"{name}\"");
+                Log($"An error occurred in setting: \"{name}\"", ConsoleLogType.Error);
 
             return ValueResult.InvalidValue;
         }
 
-        private RunCommandResult _RunCommand(string name, object[] arguments, bool silent = false)
+        public static RunCommandResult RunCommand(string name, object[] arguments, bool silent = false)
         {
             if (!_concommands.TryGetValue(name, out var command))
             {
                 if (!silent)
-                    Log($"Invalid command \"{name}\"");
+                    Log($"Invalid command \"{name}\"", ConsoleLogType.Error);
 
                 return RunCommandResult.UnknownCommand;
             }
@@ -328,7 +207,7 @@ namespace DeveloperConsole
                 if (givenArgs < command.RequiredArgs || givenArgs > command.MaxArgs)
                 {
                     if (!silent)
-                        Log($"Command \"{name}\" requires {command.RequiredArgs} <= # args <= {command.MaxArgs}. {givenArgs} arguments were given.");
+                        Log($"Command \"{name}\" requires {command.RequiredArgs} <= # args <= {command.MaxArgs}. {givenArgs} arguments were given.", ConsoleLogType.Error);
 
                     return RunCommandResult.InvalidArgCount;
                 }
@@ -370,20 +249,54 @@ namespace DeveloperConsole
             }
             catch (NotSupportedException)
             {
-                WriteLine($"Unable to convert the arguments for {name}", MessageType.Error);
+                WriteModHelperLine($"Unable to convert the arguments for {name}", MessageType.Error);
             }
             catch (Exception e)
             {
-                WriteLine(e.StackTrace);
+                WriteModHelperLine(e.StackTrace);
             }
 
             if (!silent)
-                Log($"An error occurred running the command \"{name}\"");
+                Log($"An error occurred running the command \"{name}\"", ConsoleLogType.Error);
 
             return RunCommandResult.InvalidArgs;
         }
 
-        private IEnumerable<Type> GetContainerTypes(Assembly assembly, Type containerType)
+        private static void WriteModHelperLine(string message, MessageType type = MessageType.Message)
+        {
+            DeveloperConsole.Instance.ModHelper.Console.WriteLine(message, type);
+        }
+
+        public static void Log(string message, ConsoleLogType type = ConsoleLogType.Message)
+        {
+            if (_conlogs == null)
+            {
+                WriteModHelperLine($"ConsoleManager.Log called with \"{message}\" while uninitialized!", MessageType.Warning);
+                return;
+            }
+
+            _conlogs.Enqueue( new(message, type) );
+
+            // Delete excess
+            for (int i = 0; i < _conlogs.Count - MAX_CONSOLE_MESSAGES; ++i)
+            {
+                _conlogs.Dequeue();
+            }
+
+            OnLogChanged();
+        }
+
+        public static Log GetLog(int index)
+        {
+            return _conlogs.ElementAt(index);
+        }
+
+        private static void OnLogChanged()
+        {
+            LogChanged?.Invoke(null, null);
+        }
+
+        private static IEnumerable<Type> GetContainerTypes(Assembly assembly, Type containerType)
         {
             foreach (Type type in assembly.GetTypes())
             {
@@ -398,7 +311,7 @@ namespace DeveloperConsole
             }
         }
 
-        private IEnumerable<ConVar> GetConVars(Type type, Type consoleType)
+        private static IEnumerable<Var> GetConVars(Type type, Type consoleType)
         {
             foreach(FieldInfo field in type.GetFields())
             {
@@ -406,7 +319,7 @@ namespace DeveloperConsole
                 {
                     if (field.IsLiteral || field.IsInitOnly)
                     {
-                        WriteLine($"Console type used on immutable field {type.Name}");
+                        WriteModHelperLine($"Console type used on immutable field {type.Name}");
                         continue;
                     }
 
@@ -420,7 +333,7 @@ namespace DeveloperConsole
                 {
                     if (!prop.CanWrite || !prop.CanRead)
                     {
-                        WriteLine($"Console type used on immutable/inaccessible property {type.Name}");
+                        WriteModHelperLine($"Console type used on immutable/inaccessible property {type.Name}");
                         continue;
                     }
 
@@ -429,7 +342,7 @@ namespace DeveloperConsole
             }
         }
 
-        private IEnumerable<ConCommand> GetConCommands(Type type, Type consoleType)
+        private static IEnumerable<Command> GetConCommands(Type type, Type consoleType)
         {
             foreach (MethodInfo method in type.GetMethods())
             {

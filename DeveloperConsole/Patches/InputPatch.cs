@@ -1,9 +1,9 @@
 ﻿using HarmonyLib;
 
-namespace DeveloperConsole
+namespace DeveloperConsole.Patches
 {
     [HarmonyPatch(typeof(BaseInputManager))]
-    internal static class ConsoleInputPatch
+    internal static class InputPatch
     {
         public static bool InConsole = false;
 
@@ -12,7 +12,7 @@ namespace DeveloperConsole
         public static void IsInputMode_Console(InputMode mask, ref bool __result)
         {
             if (InConsole)
-                __result = (mask == InputMode.All) || ((mask & InputMode.None) == InputMode.None);
+                __result = mask == InputMode.All || (mask & InputMode.None) == InputMode.None;
         }
 
         [HarmonyPostfix]

@@ -5,7 +5,7 @@ namespace DeveloperConsole
 {
     public interface IConsoleManager
     {
-        public void LoadAttributes(Assembly assembly, Type containerType, Type consoleType);
+        public bool LoadAttributes(Assembly assembly, Type containerType, Type consoleType);
 
         public int SetValue(string name, object value, bool silent = false);
         public int GetValue(string name, out object value, bool silent = false);
@@ -13,7 +13,7 @@ namespace DeveloperConsole
 
         public int RunCommand(string name, object[] arguments, bool silent = false);
 
-        public void Log(string message);
+        public void Log(string message, int type = 0);
     }
 
     [AttributeUsage(System.AttributeTargets.Class)]
@@ -51,6 +51,14 @@ namespace DeveloperConsole
         InvalidArgs,
     }
 
+    public enum ConsoleLogType
+    {
+        Message = 0,
+        Light,
+        Warning,
+        Error,
+    }
+
     // Utility class to improve usability of console over OWML API, most of it has to be done this way
     // because of API limitations.
     public class ConsoleWrapper
@@ -73,6 +81,6 @@ namespace DeveloperConsole
 
         public RunCommandResult RunCommand(string name, object[] arguments, bool silent = false) => (RunCommandResult)_manager.RunCommand(name, arguments, silent);
 
-        public void Log(string message) => _manager.Log(message);
+        public void Log(string message, ConsoleLogType type = ConsoleLogType.Message) => _manager.Log(message, (int)type);
     }
 }
