@@ -38,13 +38,15 @@ This can be set ingame by running, for example `test_convar 3.2` in the console.
 
 A property can also be used as a console variable:
 ```cs
+	private static float _TestConvarProp 
+
 	[ConsoleData("test_convar_property")]
 	public static float TestConvarProp 
 	{
-		get => TestConvarProp % 5;
+		get => _TestConvarProp % 5;
 		set
 		{
-			TestConvarProp = value % 10;
+			_TestConvarProp = value % 10;
 		}
 	}
 ```
