@@ -30,7 +30,7 @@ internal static class ContainerClass
 
 To create a new console variable, write something similar to the following inside your container class:
 ```cs
-	[Console("test_convar")]
+	[ConsoleData("test_convar")]
 	public static float TestConvar;
 ```
 
@@ -38,7 +38,7 @@ This can be set ingame by running, for example `test_convar 3.2` in the console.
 
 A property can also be used as a console variable:
 ```cs
-	[Console("test_convar_property")]
+	[ConsoleData("test_convar_property")]
 	public static float TestConvarProp 
 	{
 		get => TestConvarProp % 5;
@@ -51,7 +51,7 @@ A property can also be used as a console variable:
 
 To create a new console command, write something similar to the following inside your container class:
 ```cs
-	[Console("test_concommand")]
+	[ConsoleData("test_concommand")]
 	public static void TestConCommand(float value, float second = 1f) 
 	{
 		TestConvar = value * 2f + second;
@@ -62,11 +62,11 @@ This command can be run ingame by running, for example, `test_concommand 1.3` in
 
 If a console command should output to the console, the ConsoleWrapper variable created earlier can be used. Assuming this value is stored in the static variable `DevConsole`:
 ```cs
-	[Console("test_printcommand")]
+	[ConsoleData("test_printcommand")]
 	public static void TestPrintCommand(int number)
 	{
 		DevConsole.Log($"You ran TestPrintCommand with {number}!");
 	}
 ```
 
-**WARNING:** All fields, properties, and methods that use the `Console` attribute MUST be static to function properly.
+**WARNING:** All fields, properties, and methods that use the `ConsoleData` attribute MUST be static to function properly.

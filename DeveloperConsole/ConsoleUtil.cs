@@ -16,20 +16,20 @@ namespace DeveloperConsole
         public void Log(string message, int type = 0);
     }
 
-    [AttributeUsage(System.AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class)]
     public class ConsoleContainer : Attribute { }
 
     [AttributeUsage(
-        System.AttributeTargets.Field |
-        System.AttributeTargets.Method |
-        System.AttributeTargets.Property,
+        AttributeTargets.Field |
+        AttributeTargets.Method |
+        AttributeTargets.Property,
         AllowMultiple = true
         )]
-    public class Console : Attribute
+    public class ConsoleData : Attribute
     {
         public string Name { get; }
         public string Info { get; }
-        public Console(string name, string info = null)
+        public ConsoleData(string name, string info = null)
         {
             Name = name;
             Info = info;
@@ -72,7 +72,7 @@ namespace DeveloperConsole
 
         public void Link(Assembly assembly)
         {
-            _manager.LoadAttributes(assembly, typeof(ConsoleContainer), typeof(Console));
+            _manager.LoadAttributes(assembly, typeof(ConsoleContainer), typeof(ConsoleData));
         }
 
         public ValueResult SetValue(string name, object value, bool silent = false) => (ValueResult)_manager.SetValue(name, value, silent);
