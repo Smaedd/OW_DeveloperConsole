@@ -190,8 +190,159 @@ namespace DeveloperConsole
             return ValueResult.InvalidValue;
         }
 
+        // Utility functions for help and find
+        private static void PrintConVar(string name, Var data)
+        {
+            var info = data.Info;
+            var type = data.Type;
+
+            string infoStr = "";
+
+            if (info != null && info.Length != 0)
+                infoStr = $": \"{info}\"";
+
+            Log($"\t{name} ({type.Name}){infoStr}");
+        }
+
+        private static void PrintConCommand(string name, Command data)
+        {
+            var info = data.Info;
+
+            string parString = "";
+            foreach (var par in data.Parameters)
+            {
+                parString += $"{par.ParameterType.Name} {par.Name}, ";
+            }
+
+            if (parString.Length > 0)
+                parString = $" ({parString.Substring(0, parString.Length - 2)})"; // Remove trailing space and comma
+
+            string infoStr = "";
+
+            if (info != null && info.Length != 0)
+                infoStr = $": \"{info}\"";
+
+            Log($"\t{name}{parString}{infoStr}");
+        }
+
+        public static void HelpCommand()
+        {
+            var sortedVars = _convars.OrderBy(p => p.Key);
+            var sortedCommands = _concommands.OrderBy(p => p.Key);
+
+            if (sortedVars.Any())
+            {
+                Log("Console Variables:");
+                foreach (var pair in sortedVars)
+                {
+                    PrintConVar(pair.Key, pair.Value);
+                }
+            }
+
+            if (sortedCommands.Any())
+            {
+                Log("Console Commands:");
+                foreach (var pair in sortedCommands)
+                {
+                    PrintConCommand(pair.Key, pair.Value);
+                }
+            }
+        }
+
+        public static void FindCommand(string substr)
+        {
+            var foundVars = _convars.Where(p => p.Key.Contains(substr)).OrderBy(p => p.Key);
+            var foundCommands = _concommands.Where(p => p.Key.Contains(substr)).OrderBy(p => p.Key);
+
+            if (foundVars.Any())
+            {
+                Log("Console Variables:");
+                foreach (var pair in foundVars)
+                {
+                    PrintConVar(pair.Key, pair.Value);
+                }
+            }
+
+            if (foundCommands.Any())
+            {
+                Log("Console Commands:");
+                foreach (var pair in foundCommands)
+                {
+                    PrintConCommand(pair.Key, pair.Value);
+                }
+            }
+        }
+
+        public static void ClearCommand()
+        {
+            // Nothing to clear, don't bother rebuilding
+            if (_conlogs.Count <= 0)
+            {
+                return;
+            }
+
+            // HACK!
+            // ScrollView needs at least 1 item on rebuild, so dequeue everything except the last
+            var totalBegin = _conlogs.Count;
+            for (int i = 0; i < totalBegin - 1; ++i)
+            {
+                _conlogs.Dequeue();
+            }
+
+            DeveloperConsole.RebuildPanelLog();
+        }
+
+        public static RunCommandResult TryRunPriorityCommand(string name, object[] arguments, bool silent = false)
+        {
+            switch (name)
+            {
+                case "help":
+                    if (arguments.Length != 0)
+                    {
+                        Log("Command \"help\" does not take any arguments");
+                        return RunCommandResult.InvalidArgCount;
+                    }
+
+                    HelpCommand();
+                    return RunCommandResult.Success;
+                case "find":
+                    if (arguments.Length != 1)
+                    {
+                        Log("Command \"find\" takes only a single argument");
+                        return RunCommandResult.InvalidArgCount;
+                    }
+
+                    if (arguments[0].GetType() != typeof(string))
+                    {
+                        Log("Command \"find\" requires a string argument");
+                        return RunCommandResult.InvalidArgs;
+                    }
+
+                    string substr = (string)arguments[0];
+                    FindCommand(substr);
+                    return RunCommandResult.Success;
+                case "clear":
+                    if (arguments.Length != 0)
+                    {
+                        Log("Command \"clear\" does not take any arguments");
+                        return RunCommandResult.InvalidArgCount;
+                    }
+
+                    ClearCommand();
+                    return RunCommandResult.Success;
+                default:
+                    return RunCommandResult.UnknownCommand;
+            }
+        }
+
         public static RunCommandResult RunCommand(string name, object[] arguments, bool silent = false)
         {
+            // Run priority commands before anything else.
+            RunCommandResult priorityResult = TryRunPriorityCommand(name, arguments, silent);
+            if (priorityResult != RunCommandResult.UnknownCommand)
+                return priorityResult;
+
+
             if (!_concommands.TryGetValue(name, out var command))
             {
                 if (!silent)

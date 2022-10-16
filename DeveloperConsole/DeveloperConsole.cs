@@ -18,7 +18,7 @@ namespace DeveloperConsole
 
         public static UIBase uiBase { get; private set; }
 
-        private ConsolePanel _consolePanel;
+        private static ConsolePanel _consolePanel;
 
         private void Awake()
         {
@@ -64,7 +64,6 @@ namespace DeveloperConsole
 
         private void CreateUI()
         {
-
             uiBase = UniversalUI.RegisterUI("Smaed.DeveloperConsole", null);
             uiBase.Canvas.sortingLayerID = 1;
 
@@ -74,6 +73,11 @@ namespace DeveloperConsole
             uiBase.Enabled = false;
 
             InputPatch.InConsole = false;
+        }
+
+        public static void RebuildPanelLog()
+        {
+            _consolePanel?.RebuildLog();
         }
     }
 }

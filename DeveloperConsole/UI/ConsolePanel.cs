@@ -181,5 +181,10 @@ namespace DeveloperConsole.UI
 
             ConsoleManager.RunCommand(name, args, false);
         }
+
+        public void RebuildLog()
+        {
+            _consoleScrollPool.Refresh(true);
+        }
     }
 }
