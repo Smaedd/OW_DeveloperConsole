@@ -7,6 +7,13 @@ To open the console, press the `~` key ingame.
 
 To try out the console with some premade commands, download the [Console Cheats](https://github.com/Smaedd/OW_ConsoleCheats) mod.
 
+### Native commands
+
+Currently, the console has three 'native' commands (commands that do not require another mod). These are:
+`help`: Prints out every console variable and command
+`find (string search)`: Prints out every console variable and command that contains the given argument in its name
+`clear`: Clears the console log
+
 ### Using the console in your mod
 
 To use the console in your mod, copy `DeveloperConsole/ConsoleUtil.cs` to your mod, and run: 
