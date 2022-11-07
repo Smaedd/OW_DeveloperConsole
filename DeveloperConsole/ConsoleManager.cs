@@ -1,4 +1,5 @@
 ﻿using DeveloperConsole.ConsoleTypes;
+using DeveloperConsole.Input;
 using OWML.Common;
 using System;
 using System.Collections.Generic;
@@ -7,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace DeveloperConsole
 {
@@ -292,6 +294,14 @@ namespace DeveloperConsole
             DeveloperConsole.RebuildPanelLog();
         }
 
+        public static void BindCommand(string keyCode, string command)
+        {
+            if (!BindManager.Bind(keyCode, command))
+            {
+                Log($"Invalid key \"{keyCode}\"", ConsoleLogType.Error);
+            }
+        }
+
         public static RunCommandResult TryRunPriorityCommand(string name, object[] arguments, bool silent = false)
         {
             switch (name)
@@ -299,7 +309,7 @@ namespace DeveloperConsole
                 case "help":
                     if (arguments.Length != 0)
                     {
-                        Log("Command \"help\" does not take any arguments");
+                        Log("Command \"help\" does not take any arguments", ConsoleLogType.Error);
                         return RunCommandResult.InvalidArgCount;
                     }
 
@@ -308,13 +318,13 @@ namespace DeveloperConsole
                 case "find":
                     if (arguments.Length != 1)
                     {
-                        Log("Command \"find\" takes only a single argument");
+                        Log("Command \"find\" takes only a single argument", ConsoleLogType.Error);
                         return RunCommandResult.InvalidArgCount;
                     }
 
                     if (arguments[0].GetType() != typeof(string))
                     {
-                        Log("Command \"find\" requires a string argument");
+                        Log("Command \"find\" requires a string argument", ConsoleLogType.Error);
                         return RunCommandResult.InvalidArgs;
                     }
 
@@ -324,11 +334,28 @@ namespace DeveloperConsole
                 case "clear":
                     if (arguments.Length != 0)
                     {
-                        Log("Command \"clear\" does not take any arguments");
+                        Log("Command \"clear\" does not take any arguments", ConsoleLogType.Error);
                         return RunCommandResult.InvalidArgCount;
                     }
 
                     ClearCommand();
+                    return RunCommandResult.Success;
+                case "bind":
+                    if (arguments.Length != 2)
+                    {
+                        Log("Command \"bind\" takes only two arguments", ConsoleLogType.Error);
+                        return RunCommandResult.InvalidArgCount;
+                    }
+
+                    if (arguments[0].GetType() != typeof(string) || arguments[1].GetType() != typeof(string))
+                    {
+                        Log("Command \"bind\" requires two string arguments", ConsoleLogType.Error);
+                        return RunCommandResult.InvalidArgs;
+                    }
+
+                    string keyCode = (string)arguments[0];
+                    string command = (string)arguments[1];
+                    BindCommand(keyCode, command);
                     return RunCommandResult.Success;
                 default:
                     return RunCommandResult.UnknownCommand;
@@ -502,6 +529,19 @@ namespace DeveloperConsole
                     yield return new(method);
                 }
             }
+        }
+
+        public static RunCommandResult RunCommand(string command, bool silent = false)
+        {
+            Regex regex = new Regex(@"((""((?<token>.*?)(?<!\\)"")|(?<token>[\w]+))(\s)*)");
+            string[] allArgs = (from Match m in regex.Matches(command)
+                                where m.Groups["token"].Success
+                                select m.Groups["token"].Value).ToArray();
+
+            string name = allArgs.First();
+            string[] args = allArgs.Skip(1).ToArray();
+
+            return RunCommand(name, args, false);
         }
     }
 }

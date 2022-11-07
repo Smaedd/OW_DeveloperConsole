@@ -8,6 +8,7 @@ using System;
 using System.Reflection;
 using DeveloperConsole.UI;
 using DeveloperConsole.Patches;
+using DeveloperConsole.Input;
 
 namespace DeveloperConsole
 {
@@ -55,11 +56,18 @@ namespace DeveloperConsole
                 }), default);
 
             Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly());
+
+            BindManager.Deserialize();
         }
 
         private void Update()
         {
             _consolePanel?.ProcessInput();
+        }
+
+        private void Shutdown()
+        {
+            BindManager.Serialize();
         }
 
         private void CreateUI()

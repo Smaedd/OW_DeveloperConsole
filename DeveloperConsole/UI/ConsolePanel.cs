@@ -10,6 +10,8 @@ using System;
 using UniverseLib;
 using DeveloperConsole.ConsoleTypes;
 using DeveloperConsole.Patches;
+using System.Text.RegularExpressions;
+using DeveloperConsole.Input;
 
 namespace DeveloperConsole.UI
 {
@@ -125,9 +127,15 @@ namespace DeveloperConsole.UI
                     _inputField.Component.caretPosition = _inputField.Text.Length;
                 }
             }
-            else if (UniverseLib.Input.InputManager.GetKeyDown(KeyCode.BackQuote))
+            else
             {
-                OnToggled();
+                // Process here so we don't spam the console on input - might still have some bugs with other input panels :(
+                BindManager.ProcessInput();
+
+                if (UniverseLib.Input.InputManager.GetKeyDown(KeyCode.BackQuote))
+                {
+                    OnToggled();
+                }
             }
         }
 
@@ -150,7 +158,10 @@ namespace DeveloperConsole.UI
             _lastCommand = _inputField.Text;
             _inputField.Text = "";
 
-            string[] allArgs = _lastCommand.Trim().Split(' ');
+            Regex regex = new Regex(@"((""((?<token>.*?)(?<!\\)"")|(?<token>[\w]+))(\s)*)");
+            string[] allArgs = (from Match m in regex.Matches(_lastCommand)
+                                where m.Groups["token"].Success
+                                select m.Groups["token"].Value).ToArray();
 
             string name = allArgs.First();
             string[] args = allArgs.Skip(1).ToArray();
