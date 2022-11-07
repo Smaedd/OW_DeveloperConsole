@@ -10,9 +10,13 @@ To try out the console with some premade commands, download the [Console Cheats]
 ### Native commands
 
 Currently, the console has four 'native' commands (commands that do not require another mod). These are:
+
 `help`: Prints out every console variable and command
+
 `find (string search)`: Prints out every console variable and command that contains the given argument in its name
+
 `clear`: Clears the console log
+
 `bind (string key) (string command)`: Binds a key to a command (names are given by those in the UnityEngine.KeyCode enum)
 
 ### Using the console in your mod
